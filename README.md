@@ -62,6 +62,40 @@ GEMINI_API_KEY=your_gemini_api_key_here
 @handle2
 ```
 3. Install Firefox (required for Selenium)
+
+## 🧪 Testing the Script
+### Test Mode
+To test outside market hours:
+1. Open `trades_analyzer.py`
+2. Locate the `schedule_market_open()` function
+3. Comment out the production schedules and enable test mode:
+```python
+# PRODUCTION MODE - Comment these for testing:
+# schedule.every().monday.at("09:30").do(run_analysis)
+# schedule.every().tuesday.at("09:30").do(run_analysis)
+# schedule.every().wednesday.at("09:30").do(run_analysis)
+# schedule.every().thursday.at("09:30").do(run_analysis)
+# schedule.every().friday.at("09:30").do(run_analysis)
+
+# TEST MODE - Uncomment this:
+run_analysis()  # Runs immediately once
+```
+
+### Reverting to Production Mode
+1. Re-comment the test line
+2. Uncomment the schedule lines:
+```python
+# PRODUCTION MODE - Uncomment these:
+schedule.every().monday.at("09:30").do(run_analysis)
+schedule.every().tuesday.at("09:30").do(run_analysis)
+schedule.every().wednesday.at("09:30").do(run_analysis)
+schedule.every().thursday.at("09:30").do(run_analysis)
+schedule.every().friday.at("09:30").do(run_analysis)
+
+# TEST MODE - Comment this:
+# run_analysis()
+```
+
 ## 🔧 Usage
 
 ### Starting the Script
@@ -175,36 +209,57 @@ To test the scraper immediately without waiting for market hours:
 run_analysis()  # This will run the analysis immediately
 ```
 
-## 🛑 Controlling the Script
-### Graceful Shutdown
-1. Find the process ID (PID):
+## 🛑 Script Control Guide
+### Running the Script
+The script is designed to run indefinitely and will:
+- Auto-start at system boot (if configured as a service)
+- Automatically handle errors and restart
+- Log all activities for monitoring
+
+### Stopping Methods
+1. **Graceful Shutdown (Recommended)**
    ```bash
-   cat trades_analyzer.log | grep "Process ID"
-   # Or on Unix systems:
+   # Find PID
    ps aux | grep trades_analyzer.py
-   ```
-2. Stop the script gracefully:
-   ```bash
+   # OR
+   cat trades_analyzer.log | grep "Process ID"
+   
+   # Stop gracefully
    kill <PID>
    ```
-   This allows current tasks to complete.
+   - Allows current analysis to complete
+   - Saves all data properly
+   - Closes connections safely
 
-### Emergency Stop
-```bash
-kill -9 <PID>
-```
-⚠️ Use only if graceful shutdown doesn't work.
+2. **Emergency Stop**
+   ```bash
+   kill -9 <PID>
+   ```
+   ⚠️ Use only if graceful shutdown fails
+   - May leave incomplete data
+   - Doesn't close connections properly
 
-### Monitoring Status
-1. Check if running:
+### Monitoring
+1. **Check Status**
    ```bash
    ps aux | grep trades_analyzer.py
    ```
-2. View real-time logs:
+
+2. **View Live Logs**
    ```bash
    tail -f trades_analyzer.log
    ```
-3. Check heartbeat logs (hourly status updates)
+
+3. **Check Health**
+   - Look for hourly heartbeat messages
+   - Monitor for error patterns
+   - Check output file updates
+
+### Automatic Restarts
+The script will automatically:
+- Restart after 5 consecutive errors
+- Log all restart attempts
+- Maintain operation state
 
 ## 📋 Dependencies Details
 ### Required System Components
