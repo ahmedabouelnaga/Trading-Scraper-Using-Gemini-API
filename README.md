@@ -289,32 +289,41 @@ schedule.every().monday.at("10:30").do(run_analysis)  # Different time
 schedule.every().tuesday.at("09:30").do(run_analysis)
 ```
 
+# Detailed Code Block Explanation
 
-# Code Block Explanations
-
-## 1. Imports and Configuration
+## 1. Imports and Initial Setup
 ```python
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 # ... other imports ...
+from dotenv import load_dotenv
 
+# Load environment variables
+load_dotenv()
+```
+This section:
+- Imports all necessary tools and libraries
+- Loads secret information (like API keys) from a .env file
+
+## 2. Configuration and API Setup
+```python
 # Configuration
-OPENAI_API_KEY = "your-key-here"
 HEADLESS_MODE = True
 WAIT_TIMEOUT = 10
 MAX_THREADS = 5
 THREAD_TIMEOUT = 300
 OUTPUT_FILE = "congress_trades.json"
 RUNNING = True
-```
-This section:
-- Imports all needed libraries (like tools in a toolbox)
-- Sets up important variables that control how the program runs
-- HEADLESS_MODE means Firefox runs invisibly
-- WAIT_TIMEOUT is how long to wait for pages to load
-- MAX_THREADS is how many Twitter accounts it can check at once
 
-## 2. Logging Setup
+# Get API key from environment variable
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+```
+This part:
+- Sets up basic settings for how the program runs
+- Gets the Gemini AI API key from the environment
+- Initializes the Gemini AI model for later use
+
+## 3. Logging System Setup
 ```python
 log_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 log_handler = logging.handlers.RotatingFileHandler(
@@ -323,125 +332,128 @@ log_handler = logging.handlers.RotatingFileHandler(
     backupCount=5
 )
 ```
-This part:
-- Sets up a system to keep track of what the program does
-- Creates log files that record everything that happens
-- Rotates logs when they get too big (10MB)
-- Keeps 5 backup log files
+This creates:
+- A system to record everything the program does
+- Logs that rotate when they get too big (10MB)
+- Both console and file logging
 
-## 3. Twitter Scraping Function
+## 4. Time Handling Functions
+```python
+def get_current_time_est() -> datetime:
+    """Get current time in EST/EDT."""
+    est = pytz.timezone('America/New_York')
+    return datetime.now(est)
+
+def get_timestamp_str() -> str:
+    """Get formatted timestamp string."""
+    current_time = get_current_time_est()
+    return current_time.strftime("%A, %B %d, %Y %I:%M:%S %p %Z")
+```
+These functions:
+- Handle time zones (specifically EST for stock market)
+- Format dates and times nicely for logging
+
+## 5. File Management Functions
+```python
+def initialize_json_file() -> None:
+    """Initialize JSON file if it doesn't exist."""
+    if not os.path.exists(OUTPUT_FILE):
+        with open(OUTPUT_FILE, 'w') as f:
+            json.dump({
+                "trading_sessions": []
+            }, f, indent=2)
+```
+This part:
+- Creates the output file if it doesn't exist
+- Sets up the basic structure for storing trade data
+
+## 6. Tweet Collection Function
 ```python
 def get_congress_member_tweets(username: str) -> List[tuple]:
+    """Fetch tweets for a given congressional member."""
     options = webdriver.FirefoxOptions()
     if HEADLESS_MODE:
         options.add_argument('--headless')
     driver = webdriver.Firefox(options=options)
     tweets = []
-    
-    try:
-        driver.get(f"https://twitter.com/{username}")
-        # ... rest of function ...
 ```
 This function:
-- Opens Firefox browser (invisibly)
-- Goes to a specific Twitter profile
-- Collects all tweets it can find
-- Returns them as a list
+- Opens Firefox (invisibly)
+- Goes to a Twitter profile
+- Collects all visible tweets
+- Returns them for analysis
 
-## 4. Tweet Analysis Function
+## 7. Gemini AI Analysis Function
 ```python
+@retry.Retry(predicate=retry.if_exception_type(Exception))
 def analyze_tweet(username: str, text: str) -> Optional[Dict[str, Union[str, int]]]:
+```
+This is the core analysis function that:
+- Takes a tweet
+- Sends it to Gemini AI with specific instructions
+- Gets back trading information
+- Has an extensive prompt to guide the AI's analysis
+
+## 8. Tweet Processing Function
+```python
+def process_tweet(username: str, text: str) -> None:
+    """Process a single tweet and write the analysis results to JSON file."""
     if not text:
-        return None
-    
-    client = OpenAI(api_key=OPENAI_API_KEY)
-    
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{
-                "role": "system",
-                "content": """... prompt ..."""
-            }]
+        return
+        
+    stock_symbols = re.findall(r'\$([A-Z]+)', text)
 ```
 This function:
-- Takes a tweet's text
-- Sends it to GPT to analyze
-- Looks for trading information
-- Returns information about any trades mentioned
+- Looks for stock symbols in tweets ($AAPL style)
+- Sends tweets for analysis if they contain stocks
+- Saves the results
 
-## 5. JSON File Handling
-```python
-def write_to_json_file(data: Dict[str, Any]) -> None:
-    with file_lock:
-        try:
-            with open(OUTPUT_FILE, 'r') as f:
-                file_data = json.load(f)
-            # ... rest of function ...
-```
-This part:
-- Safely saves trading information to a file
-- Makes sure multiple parts of the program don't write at once
-- Organizes data by trading sessions and dates
-
-## 6. Main Analysis Runner
+## 9. Main Analysis Runner
 ```python
 def run_analysis() -> None:
-    try:
-        logger.info(f"Starting analysis at {get_timestamp_str()}")
-        
-        with open("twitter_handles.txt", "r") as f:
-            twitter_handles = [line.strip() for line in f.readlines() if line.strip()]
+    """Main analysis function that runs at market open."""
+    if not validate_api_key():
+        logger.error("Invalid API key. Skipping analysis.")
+        return
 ```
-This function:
-- Reads the list of Twitter accounts to check
-- Starts the whole process of collecting and analyzing tweets
-- Uses multiple threads to check several accounts at once
+This coordinates everything:
+- Checks if the API key is valid
+- Reads the list of Twitter accounts
+- Manages multiple threads for faster processing
 
-## 7. Scheduling System
+## 10. Scheduling System
 ```python
 def schedule_market_open() -> None:
-    initialize_json_file()
+    """Schedule the script to run at market open (9:30 AM EST)."""
+    # PRODUCTION MODE: Uncomment these for normal operation
+    # schedule.every().monday.at("09:30").do(run_analysis)
+    # ...
     
-    schedule.every().monday.at("09:30").do(run_analysis)
-    schedule.every().tuesday.at("09:30").do(run_analysis)
-    # ... more scheduling ...
+    # TEST MODE: Uncomment this line to run immediately
+    run_analysis()
 ```
 This part:
-- Sets up when the program should run
-- Schedules it for every weekday at 9:30 AM EST
-- Keeps track of any errors that happen
+- Has two modes: Test and Production
+- Test mode runs immediately
+- Production mode runs at market open each day
 
-## 8. Background Process Setup
+## 11. Background Process (Daemon) Setup
 ```python
 def create_daemon():
+    """Run the program as a daemon process."""
     try:
         if os.name != 'nt':  # Not on Windows
             pid = os.fork()
-            # ... rest of function ...
 ```
 This function:
 - Makes the program run in the background
-- Sets up proper logging for background mode
-- Works differently on Windows vs other systems
+- Works differently on Windows vs Unix systems
+- Handles logging for background operation
 
-## 9. Main Program Entry
-```python
-if __name__ == "__main__":
-    try:
-        if os.name != 'nt':
-            if not create_daemon():
-                logger.error("Failed to create daemon. Running in foreground.")
-        # ... rest of main ...
-```
-This section:
-- Starts the whole program
-- Tries to run as a background process
-- Sets up error handling
-- Begins the scheduling system
-
-
-
-
-
-
+## Main Differences from Previous Version:
+1. Uses Gemini AI instead of OpenAI
+2. Has more robust error handling
+3. Includes API key validation
+4. Has a more detailed analysis prompt
+5. Includes test mode for immediate running
+6. Better logging of errors and activities
