@@ -11,6 +11,29 @@ This project is for **educational purposes only**. The author:
 ## 🎯 Overview
 This script monitors Twitter for congressional trading activity, analyzes tweets using Google's Gemini AI, and logs trading patterns. It runs automatically during market hours and handles data collection safely and efficiently.
 
+## 📥 Getting Started
+1. Clone the repository:
+```bash
+git clone https://github.com/ahmedabouelnaga/Trade-Scraper-Using-Gemini-API.git
+cd Trade-Scraper-Using-Gemini-API
+```
+
+2. Create and activate a virtual environment (recommended):
+```bash
+# On Unix/macOS
+python -m venv venv
+source venv/bin/activate
+
+# On Windows
+python -m venv venv
+.\venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
 ## 🚀 Setup & Installation
 
 ### Prerequisites
